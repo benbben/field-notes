@@ -1,16 +1,32 @@
 import { useEffect, useState } from 'react';
-import { db, getMeta, setMeta, META, BACKUP } from '../db/db.js';
+import { db, BACKUP } from '../db/db.js';
 import { cryptoId } from '../db/seed.js';
+
+// Custom data-change emitter — Dexie 4 has no 'changes' event without
+// the dexie-observable plugin, so we notify ourselves after mutations.
+const bus = new EventTarget();
+function notifyChange() { bus.dispatchEvent(new Event('change')); }
+function onChange(fn) {
+  bus.addEventListener('change', fn);
+  return () => bus.removeEventListener('change', fn);
+}
 
 export function useAllSessions() {
   const [list, setList] = useState(null);
   useEffect(() => {
-    const reload = () =>
-      db.sessions.orderBy('started_at').reverse().toArray().then(setList);
+    let alive = true;
+    const reload = async () => {
+      try {
+        const rows = await db.sessions.orderBy('started_at').reverse().toArray();
+        if (alive) setList(rows);
+      } catch (e) {
+        console.error('useAllSessions reload failed', e);
+        if (alive) setList([]);
+      }
+    };
     reload();
-    const handler = () => reload();
-    db.on('changes', handler);
-    return () => db.on('changes').unsubscribe(handler);
+    const off = onChange(reload);
+    return () => { alive = false; off(); };
   }, []);
   return list;
 }
@@ -53,6 +69,7 @@ export async function createSession(partial) {
     }));
     await db.doses.bulkPut(doses);
   }
+  notifyChange();
   return id;
 }
 
@@ -61,6 +78,7 @@ export async function updateSession(id, patch) {
   if (!cur) return;
   const next = { ...cur, ...patch, updated_at: Date.now() };
   await db.sessions.put(next);
+  notifyChange();
 }
 
 export async function replaceDoses(sessionId, doses) {
@@ -73,6 +91,7 @@ export async function replaceDoses(sessionId, doses) {
       })));
     }
   });
+  notifyChange();
 }
 
 export async function deleteSession(id) {
@@ -80,6 +99,7 @@ export async function deleteSession(id) {
     await db.doses.where({ session_id: id }).delete();
     await db.sessions.delete(id);
   });
+  notifyChange();
 }
 
 export async function exportAll() {
@@ -96,7 +116,6 @@ export async function exportAll() {
   };
 }
 
-// Merge by id; later updated_at wins for sessions/doses
 export async function importAll(payload) {
   if (!payload || payload.schema !== 'field-notes/1') {
     throw new Error('Unsupported export schema');
@@ -121,6 +140,7 @@ export async function importAll(payload) {
       if (!cur) await db.batches.put(b);
     }
   });
+  notifyChange();
 }
 
 export async function getBackupCfg() {

@@ -1,19 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './index.css';
 import { ensureSeed } from './db/seed.js';
 
-ensureSeed().catch(()=>{});
+ensureSeed().catch(err => console.error('seed failed', err));
 
-// Request persistent storage early — best-effort.
 if (navigator.storage && navigator.storage.persist) {
-  navigator.storage.persisted().then(p => { if (!p) navigator.storage.persist(); });
+  navigator.storage.persisted().then(p => { if (!p) navigator.storage.persist().catch(()=>{}); }).catch(()=>{});
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
 
-// PWA SW registration — vite-plugin-pwa generates an injected register; do it manually for control.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     import('virtual:pwa-register').then(({ registerSW }) => {
