@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  background: #0a0a0a;
+  color: #fafafa;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+input, textarea, select, button {
+  font: inherit;
+  color: inherit;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.btn {
+  @apply rounded-2xl px-4 py-3 text-base font-medium transition active:scale-[0.98];
+}
+.btn-primary { @apply btn bg-accent text-bg-0 hover:bg-accent-dim; }
+.btn-secondary { @apply btn bg-bg-2 text-ink-0 hover:bg-bg-3; }
+.btn-ghost { @apply btn text-ink-1 hover:bg-bg-2; }
+.btn-danger { @apply btn bg-bad/20 text-bad hover:bg-bad/30; }
+
+.card { @apply bg-bg-1 rounded-2xl p-4 border border-bg-3; }
+
+.field {
+  @apply w-full bg-bg-2 border border-bg-3 rounded-xl px-3 py-3 text-ink-0
+         placeholder:text-ink-3 focus:outline-none focus:border-accent;
+}
+.label { @apply block text-sm text-ink-2 mb-1; }
+
+.tag {
+  @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs
+         bg-bg-2 text-ink-1 border border-bg-3;
+}
+.tag-active { @apply bg-accent/20 text-accent border-accent/40; }
+
+.dot { @apply w-2.5 h-2.5 rounded-full inline-block; }
+.dot-red { @apply bg-bad; }
+.dot-yellow { @apply bg-warn; }
+.dot-green { @apply bg-ok; }
+
+.tab-button { @apply flex-1 flex flex-col items-center justify-center gap-1 py-2 text-xs text-ink-2; }
+.tab-active { @apply text-accent; }
+
+@media (prefers-color-scheme: light) {
+  /* honor user's manual class toggle; default is dark */
+}
+.light body { background: #fafafa; color: #0a0a0a; }
+
+.scroll-area { overscroll-behavior: contain; }
