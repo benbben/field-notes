@@ -2,8 +2,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// Base path is set via VITE_BASE env at build time
-const base = process.env.VITE_BASE || '/';
+// Base path resolution:
+// 1. VITE_BASE env (explicit override; used by CI)
+// 2. /<basename>/ where <basename> is auto-detected from VITE_REPO_NAME
+//    (CI sets this from ${{ github.event.repository.name }}, ensuring forks "just work")
+// 3. '/' for local dev
+function resolveBase() {
+  if (process.env.VITE_BASE) return process.env.VITE_BASE;
+  const repo = process.env.VITE_REPO_NAME;
+  if (repo) return `/${repo}/`;
+  return '/';
+}
+
+const base = resolveBase();
 
 export default defineConfig({
   base,

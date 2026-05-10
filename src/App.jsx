@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Lock from './components/Lock.jsx';
+import Welcome from './components/Welcome.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import Sessions from './views/Sessions.jsx';
@@ -13,17 +14,29 @@ import { loadSessionFull } from './state/store.js';
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
   const [tab, setTab] = useState('dashboard');
-  const [route, setRoute] = useState({ name: 'tab' }); // {name:'tab'|'new'|'detail'|'edit'}
-  const [theme, setTheme] = useState('dark');
+  const [route, setRoute] = useState({ name: 'tab' });
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     (async () => {
       const t = (await getMeta(META.THEME)) || 'dark';
-      setTheme(t);
       document.documentElement.classList.toggle('light', t === 'light');
     })();
     installAutoLock(() => setUnlocked(false));
   }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    (async () => {
+      const seen = await getMeta(META.ONBOARDED);
+      if (!seen) setShowWelcome(true);
+    })();
+  }, [unlocked]);
+
+  const dismissWelcome = async () => {
+    setShowWelcome(false);
+    await setMeta(META.ONBOARDED, true);
+  };
 
   if (!unlocked) {
     return <div className="h-dvh">
@@ -51,6 +64,7 @@ export default function App() {
     <div className="h-dvh flex flex-col">
       <main className="flex-1 overflow-auto scroll-area">{body}</main>
       <BottomTabs active={tab} onChange={(t) => { setTab(t); closeRoute(); }} onNew={goNew} />
+      {showWelcome && <Welcome onDismiss={dismissWelcome} />}
     </div>
   );
 }
