@@ -25,14 +25,12 @@ export default function Dashboard({ goSession, goNew }) {
     db.doses.toArray().then(setAllDoses);
   }, [sessions]);
 
-  // Map sessionId -> session
   const sessionMap = useMemo(() => {
     const m = new Map();
     (sessions || []).forEach(s => m.set(s.id, s));
     return m;
   }, [sessions]);
 
-  // Compute most recent dose per substance with start time
   const lastBy = useMemo(() => {
     const map = {};
     for (const d of allDoses) {
@@ -84,9 +82,17 @@ export default function Dashboard({ goSession, goNew }) {
                 <div className="flex items-center gap-2">
                   <span className={`dot dot-${rank.color}`} data-testid={`status-color-${sub}`}></span>
                   <span className="text-xs text-ink-1" data-testid={`next-${sub}`}>
-                    {iv.minMs === 0 ? 'clear' :
-                      (now >= last.startedAt + iv.minMs ? 'OK' : `${Math.ceil((last.startedAt+iv.minMs-now)/DAY)}d`)
-                    }
+                    {(() => {
+                      if (iv.minMs === 0) return 'clear';
+                      const elapsed = now - last.startedAt;
+                      if (elapsed < iv.minMs) {
+                        return `${Math.ceil((iv.minMs - elapsed)/DAY)}d`;
+                      }
+                      if (elapsed < iv.recMs) {
+                        return `${Math.ceil((iv.recMs - elapsed)/DAY)}d rec`;
+                      }
+                      return 'OK';
+                    })()}
                   </span>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 // Re-dose interval logic
 // MDMA: min 8 weeks, recommended 12 weeks
-// LSD: last total claimed µg ≤100 → 6 days; else 14 days
+// LSD: last total claimed µg ≥200 → 13 days; else 6 days
 // Psilocybin: last dose ≤1.5g → 6 days; else 14 days
 // LSD ↔ Psilocybin cross-tolerance: apply longer of the two windows
 // Cannabis, DMT, Adderall: no floor
@@ -17,7 +17,7 @@ export function intervalsFor(detail) {
       return { minMs: 8 * WEEK, recMs: 12 * WEEK, basis: '8w min / 12w recommended' };
     case 'lsd': {
       const ug = detail.totalUnit === 'µg' ? Number(detail.total) : 0;
-      const days = ug <= 100 ? 6 : 14;
+      const days = ug >= 200 ? 13 : 6;
       return { minMs: days * DAY, recMs: days * DAY, basis: `${days} days (last ${ug} µg)` };
     }
     case 'psilocybin': {
@@ -31,8 +31,6 @@ export function intervalsFor(detail) {
 }
 
 // Compute next-allowed time for a given substance, considering cross-tolerance with LSD ↔ Psilocybin.
-// lastBy: { substance: { startedAt, total, totalUnit } }
-// substance: target substance to compute "next allowed" for
 export function nextAllowed(substance, lastBy) {
   const sub = (substance || '').toLowerCase();
   const own = lastBy[sub];
@@ -45,7 +43,6 @@ export function nextAllowed(substance, lastBy) {
       basis: `${cap(sub)} ${iv.basis}`
     });
   }
-  // cross tolerance
   const crossSet = (sub === 'lsd' || sub === 'psilocybin')
     ? ['lsd','psilocybin'].filter(s => s !== sub)
     : [];
@@ -60,14 +57,11 @@ export function nextAllowed(substance, lastBy) {
     });
   }
   if (candidates.length === 0) return null;
-  // pick the latest (longest of the windows)
   candidates.sort((a,b) => b.when - a.when);
   return candidates[0];
 }
 
-// Color for a "now vs next allowed" state. Recommended >= min.
 export function rankAgainstWindow(now, lastStart, intervals) {
-  // intervals.minMs / recMs both relative to lastStart
   if (!lastStart) return { color: 'green', label: 'no prior dose' };
   const elapsed = now - lastStart;
   if (elapsed < intervals.minMs) return { color: 'red', label: 'under min interval' };
