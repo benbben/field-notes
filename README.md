@@ -1,2 +1,3 @@
-# field-notes
+# Field Notes
+
 Personal journaling tool. Private.
