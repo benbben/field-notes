@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { db, getMeta, setMeta, META } from '../db/db.js';
-import { hashPasscode } from '../lib/crypto.js';
-import { setPasscode, hasPasscode, tryUnlock } from '../lib/auth.js';
-import { exportAll, importAll, getBackupCfg, setBackupCfg } from '../state/store.js';
+import { useEffect, useRef, useState } from 'react';
+import { getMeta, setMeta, META } from '../db/db.js';
+import { setPasscode, tryUnlock } from '../lib/auth.js';
+import { exportAll, importAll, getBackupCfg, setBackupCfg, onChange } from '../state/store.js';
 import { backupToGitHub, ghPing, restoreFromGitHub } from '../lib/backup.js';
+import { exportJsonFile } from '../lib/exportFile.js';
+import { APP_VERSION } from '../lib/version.js';
+import { checkForUpdate, hasPendingUpdate, isUpdateSupported, setDirty } from '../lib/updates.js';
 
 export default function Settings({ onLock }) {
   const [theme, setTheme] = useState('dark');
@@ -25,7 +27,7 @@ export default function Settings({ onLock }) {
   };
 
   return (
-    <div className="p-4 space-y-4 pb-28 max-w-md mx-auto" data-testid="settings-view">
+    <div className="p-4 space-y-4 pb-8 max-w-md mx-auto" data-testid="settings-view">
       <h1 className="text-2xl font-medium">Settings</h1>
 
       <section className="card space-y-3">
@@ -56,6 +58,8 @@ export default function Settings({ onLock }) {
       <GitHubBackup onMsg={setMsg} />
 
       {msg && <div className="text-sm text-ink-1" data-testid="settings-msg">{msg}</div>}
+
+      <BuildInfo onMsg={setMsg} />
     </div>
   );
 }
@@ -63,6 +67,9 @@ export default function Settings({ onLock }) {
 function ChangePasscode({ onMsg }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
+  // Typed-but-unsubmitted passcodes defer app updates like any other form.
+  useEffect(() => { setDirty('settings-passcode', current !== '' || next !== ''); }, [current, next]);
+  useEffect(() => () => setDirty('settings-passcode', false), []);
   const change = async () => {
     if (!await tryUnlock(current)) { onMsg('Current passcode incorrect'); return; }
     if (!/^\d{4}$|^\d{6}$/.test(next)) { onMsg('New passcode must be 4 or 6 digits'); return; }
@@ -82,24 +89,51 @@ function ChangePasscode({ onMsg }) {
 
 function ImportExport({ onMsg }) {
   const [importing, setImporting] = useState(false);
-  const exportNow = async () => {
-    const data = await exportAll();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `field-notes-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    onMsg(`Exported ${data.sessions.length} sessions`);
+
+  // Safari only allows navigator.share() synchronously inside the tap, so the
+  // export payload is prefetched here and refreshed whenever data changes.
+  const payloadRef = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => exportAll().then(p => { if (alive) payloadRef.current = p; }).catch(() => {});
+    load();
+    const off = onChange(load);
+    return () => { alive = false; off(); };
+  }, []);
+
+  const exportNow = () => {
+    const payload = payloadRef.current;
+    if (!payload) {
+      onMsg('Preparing export — tap again in a moment');
+      exportAll().then(p => { payloadRef.current = p; }).catch(() => {});
+      return;
+    }
+    const name = `field-notes-${new Date().toISOString().slice(0,10)}.json`;
+    const text = JSON.stringify({ ...payload, exported_at: Date.now() }, null, 2);
+    const n = payload.sessions.length;
+    let result;
+    try {
+      result = exportJsonFile(text, name, 'Field Notes export');
+    } catch (e) {
+      onMsg(`Export failed: ${e.message}`);
+      return;
+    }
+    result.done
+      .then(() => onMsg(`Exported ${n} sessions${result.method === 'share' ? '' : ' (download)'}`))
+      .catch(e => {
+        if (e && e.name === 'AbortError') onMsg('Export cancelled');
+        else onMsg(`Export failed: ${e?.message || e}`);
+      });
   };
+
   const onPick = async (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     setImporting(true);
     try {
       const text = await f.text();
       const obj = JSON.parse(text);
-      await importAll(obj);
-      onMsg(`Imported ${obj.sessions?.length || 0} sessions`);
+      const r = await importAll(obj);
+      onMsg(`Imported ${r.sessions} sessions`);
     } catch (err) {
       onMsg(`Import failed: ${err.message}`);
     } finally {
@@ -114,7 +148,7 @@ function ImportExport({ onMsg }) {
         <button className="btn-secondary flex-1" onClick={exportNow} data-testid="export-json">Export JSON</button>
         <label className="btn-secondary flex-1 text-center cursor-pointer" data-testid="import-json-label">
           {importing ? 'Importing…' : 'Import JSON'}
-          <input type="file" className="hidden" accept="application/json" onChange={onPick} data-testid="import-json-input" />
+          <input type="file" className="hidden" accept=".json,application/json" onChange={onPick} data-testid="import-json-input" />
         </label>
       </div>
     </section>
@@ -122,18 +156,28 @@ function ImportExport({ onMsg }) {
 }
 
 function GitHubBackup({ onMsg }) {
-  const [cfg, setCfg] = useState({ pat: '', owner: '', repo: '', path: 'field-notes-backup.json', branch: 'main' });
+  const EMPTY_CFG = { pat: '', owner: '', repo: '', path: 'field-notes-backup.json', branch: 'main' };
+  const [cfg, setCfg] = useState(EMPTY_CFG);
+  const [savedCfg, setSavedCfg] = useState(EMPTY_CFG);
   const [passphrase, setPassphrase] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getBackupCfg().then(saved => { if (saved) setCfg({ pat: '', ...saved }); });
+    getBackupCfg().then(saved => { if (saved) { const c = { pat: '', ...saved }; setCfg(c); setSavedCfg(c); } });
   }, []);
+
+  // Unsaved config edits or a typed passphrase defer app updates (see src/lib/updates.js).
+  useEffect(() => {
+    const unsaved = passphrase !== '' || JSON.stringify(cfg) !== JSON.stringify(savedCfg);
+    setDirty('settings-backup', unsaved);
+  }, [cfg, savedCfg, passphrase]);
+  useEffect(() => () => setDirty('settings-backup', false), []);
 
   const update = (k, v) => setCfg(c => ({ ...c, [k]: v }));
 
   const saveCfg = async () => {
     await setBackupCfg({ ...cfg }); // includes pat
+    setSavedCfg({ ...cfg });
     onMsg('Backup config saved');
   };
 
@@ -185,6 +229,31 @@ function GitHubBackup({ onMsg }) {
         <button className="btn-primary flex-1" onClick={backup} disabled={busy} data-testid="gh-backup-btn">Backup to GitHub</button>
         <button className="btn-secondary flex-1" onClick={restore} disabled={busy} data-testid="gh-restore-btn">Restore</button>
       </div>
+    </section>
+  );
+}
+
+function BuildInfo({ onMsg }) {
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    try {
+      if (!isUpdateSupported()) { onMsg('Updates are not available in this browser'); return; }
+      onMsg('Checking for update…');
+      await checkForUpdate();
+      // Give a found update a moment to install before reporting.
+      await new Promise(r => setTimeout(r, 1500));
+      onMsg(hasPendingUpdate()
+        ? 'Update ready — it applies as soon as you leave the form you are editing'
+        : 'You have the latest version');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="card flex items-center justify-between gap-3" data-testid="build-info">
+      <div className="text-xs text-ink-2" data-testid="build-version">Build {APP_VERSION}</div>
+      <button className="btn-secondary text-sm whitespace-nowrap" onClick={check} disabled={busy} data-testid="check-update">Check for update</button>
     </section>
   );
 }

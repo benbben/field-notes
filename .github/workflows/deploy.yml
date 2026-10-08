@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
+      - name: Verify icons
+        # Fully decodes every PNG and fails the build on wrong size or any transparency,
+        # so a truncated or transparent icon can never ship again.
+        run: node scripts/verify-icons.mjs
       - name: Build
         run: npm run build
         env:

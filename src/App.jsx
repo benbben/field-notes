@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import Lock from './components/Lock.jsx';
 import Welcome from './components/Welcome.jsx';
 import BottomTabs from './components/BottomTabs.jsx';
+import UpdateChip from './components/UpdateChip.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import Sessions from './views/Sessions.jsx';
 import NewSession from './views/NewSession.jsx';
 import SessionDetail from './views/SessionDetail.jsx';
 import Settings from './views/Settings.jsx';
-import { isUnlocked, lock, installAutoLock } from './lib/auth.js';
+import { lock, installAutoLock } from './lib/auth.js';
 import { getMeta, setMeta, META } from './db/db.js';
 import { loadSessionFull } from './state/store.js';
 
@@ -39,9 +40,14 @@ export default function App() {
   };
 
   if (!unlocked) {
-    return <div className="h-dvh">
-      <Lock onUnlock={() => setUnlocked(true)} />
-    </div>;
+    return (
+      <div className="app-shell" data-testid="lock-shell">
+        <main className="app-main" data-testid="main">
+          <Lock onUnlock={() => setUnlocked(true)} />
+        </main>
+        <UpdateChip />
+      </div>
+    );
   }
 
   const goSession = (id) => setRoute({ name: 'detail', id });
@@ -53,7 +59,8 @@ export default function App() {
   const closeRoute = () => setRoute({ name: 'tab' });
 
   let body;
-  if (route.name === 'new') body = <NewSession onDone={() => { closeRoute(); setTab('sessions'); }} />;
+  // Save lands on Sessions; Cancel (onDone(null)) returns to the tab the user came from.
+  if (route.name === 'new') body = <NewSession onDone={(id) => { closeRoute(); if (id) setTab('sessions'); }} />;
   else if (route.name === 'edit') body = <NewSession initial={route.initial} onDone={() => { closeRoute(); }} />;
   else if (route.name === 'detail') body = <SessionDetail id={route.id} onBack={closeRoute} onEdit={goEdit} />;
   else if (tab === 'dashboard') body = <Dashboard goSession={goSession} goNew={goNew} />;
@@ -61,10 +68,11 @@ export default function App() {
   else if (tab === 'settings') body = <Settings onLock={() => { lock(); setUnlocked(false); }} />;
 
   return (
-    <div className="h-dvh flex flex-col">
-      <main className="flex-1 overflow-auto scroll-area">{body}</main>
+    <div className="app-shell" data-testid="app-shell">
+      <main className="app-main" data-testid="main">{body}</main>
       <BottomTabs active={tab} onChange={(t) => { setTab(t); closeRoute(); }} onNew={goNew} />
       {showWelcome && <Welcome onDismiss={dismissWelcome} />}
+      <UpdateChip />
     </div>
   );
 }

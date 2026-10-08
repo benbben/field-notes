@@ -2,15 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { height: 100%; }
+/* Safe-area insets as variables. The shell, nav and tests read these;
+   tests override them on :root to simulate a notch / home indicator. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body { height: 100%; overflow: hidden; }
+#root { height: 100%; }
 body {
+  margin: 0;
   background: #0a0a0a;
   color: #fafafa;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: contain;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 input, textarea, select, button {
   font: inherit;
@@ -18,6 +27,34 @@ input, textarea, select, button {
 }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* App shell: a fixed, full-screen column. Only <main> scrolls; the nav never
+   leaves the screen. Insets are applied inside (main top, nav bottom) so the
+   shell itself is exactly the viewport on iOS with viewport-fit=cover. */
+.app-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-top: var(--sat);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+.app-nav {
+  flex: none;
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
 
 .btn {
   @apply rounded-2xl px-4 py-3 text-base font-medium transition active:scale-[0.98];
@@ -46,8 +83,22 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 .dot-yellow { @apply bg-warn; }
 .dot-green { @apply bg-ok; }
 
-.tab-button { @apply flex-1 flex flex-col items-center justify-center gap-1 py-2 text-xs text-ink-2; }
+.tab-button {
+  @apply flex-1 flex flex-col items-center justify-center gap-1 py-1.5 text-xs text-ink-2;
+  min-height: 48px;
+}
+.tab-button svg { width: 22px; height: 22px; display: block; }
 .tab-active { @apply text-accent; }
+
+/* Non-blocking "update ready" chip pinned under the top inset. */
+.update-chip {
+  position: fixed;
+  top: calc(var(--sat) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  @apply rounded-full bg-accent text-bg-0 text-xs font-medium px-3 py-1.5 shadow-lg;
+}
 
 @media (prefers-color-scheme: light) {
   /* honor user's manual class toggle; default is dark */

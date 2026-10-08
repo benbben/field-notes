@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '../db/db.js';
-import { calcDose, SUBSTANCES } from '../lib/doses.js';
+import { calcDose, labelFor, SUBSTANCES } from '../lib/doses.js';
 import { deleteSession, useAllSessions } from '../state/store.js';
 
 export default function Sessions({ goSession }) {
@@ -22,18 +22,15 @@ export default function Sessions({ goSession }) {
   }, [allDoses]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return (sessions || []).filter(s => {
       if (filterSub) {
         const ds = dosesById.get(s.id) || [];
         if (!ds.some(d => (d.substance || '').toLowerCase() === filterSub)) return false;
       }
-      if (search) {
-        const text = [
-          s.context_text, s.reflection_in_moment,
-          s.reflection_day_after, s.reflection_post,
-          ...(s.set_tags || []), ...(s.setting_tags || [])
-        ].filter(Boolean).join(' ').toLowerCase();
-        if (!text.includes(search.toLowerCase())) return false;
+      if (q) {
+        const text = (s.notes || '').toLowerCase();
+        if (!text.includes(q)) return false;
       }
       return true;
     });
@@ -45,7 +42,7 @@ export default function Sessions({ goSession }) {
   };
 
   return (
-    <div className="p-4 space-y-3 pb-28 max-w-md mx-auto" data-testid="sessions-view">
+    <div className="p-4 space-y-3 pb-8 max-w-md mx-auto" data-testid="sessions-view">
       <h1 className="text-2xl font-medium">Sessions</h1>
       <div className="flex gap-2">
         <select className="field flex-1" value={filterSub} onChange={e => setFilterSub(e.target.value)} data-testid="filter-sub">
@@ -53,16 +50,16 @@ export default function Sessions({ goSession }) {
           {SUBSTANCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
       </div>
-      <input className="field" placeholder="Search context & reflection…" value={search} onChange={e => setSearch(e.target.value)} data-testid="search-text" />
+      <input className="field" placeholder="Search notes…" value={search} onChange={e => setSearch(e.target.value)} data-testid="search-text" />
 
       <div className="space-y-2">
         {filtered.map(s => (
           <div key={s.id} className="card" data-testid={`session-row-${s.id}`}>
             <div className="flex items-start justify-between">
-              <button onClick={() => goSession(s.id)} className="flex-1 text-left">
+              <button onClick={() => goSession(s.id)} className="flex-1 text-left" data-testid={`session-open-${s.id}`}>
                 <div className="font-medium">{new Date(s.started_at).toLocaleString()}</div>
                 <div className="text-xs text-ink-2 mt-1">
-                  {(dosesById.get(s.id) || []).map(d => `${prettyName(d.substance)} ${calcDose(d).display}`).join(' · ') || '—'}
+                  {(dosesById.get(s.id) || []).map(d => `${labelFor(d.substance)} ${calcDose(d).display}`).join(' · ') || '—'}
                 </div>
                 {(s.set_tags?.length || s.setting_tags?.length) ? (
                   <div className="flex flex-wrap gap-1 mt-2">
@@ -86,10 +83,4 @@ export default function Sessions({ goSession }) {
       </div>
     </div>
   );
-}
-
-function prettyName(s) {
-  if (s === 'lsd' || s === 'dmt') return s.toUpperCase();
-  if (s === 'mdma') return 'MDMA';
-  return (s || '').charAt(0).toUpperCase() + (s || '').slice(1);
 }

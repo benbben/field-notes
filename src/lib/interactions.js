@@ -9,8 +9,14 @@
 // - MDMA + Psilocybin: hippy flip (NOT candyflip)
 // - Any psychedelic + Adderall: anxiety, cardio strain
 // - DMT + MDMA: serotonergic load
+// - 2C-B + MDMA: combined cardiovascular and serotonergic load
+// - 2C-B + LSD / Psilocybin: synergistic, cross-tolerance
+// - 2C-B + Cannabis: cannabis amplifies, can destabilize
+// - 2C-B + DMT: synergistic
 
-const PSYCHEDELICS = new Set(['lsd', 'psilocybin', 'dmt']);
+import { labelFor } from './doses.js';
+
+const PSYCHEDELICS = new Set(['lsd', 'psilocybin', 'dmt', '2cb']);
 
 const PAIRS = [
   {
@@ -52,6 +58,31 @@ const PAIRS = [
     a: 'dmt', b: 'mdma',
     title: 'DMT + MDMA',
     body: 'Serotonergic load.'
+  },
+  {
+    a: '2cb', b: 'mdma',
+    title: '2C-B + MDMA',
+    body: 'Combined cardiovascular and serotonergic load.'
+  },
+  {
+    a: '2cb', b: 'lsd',
+    title: '2C-B + LSD',
+    body: 'Synergistic; cross-tolerance between the two.'
+  },
+  {
+    a: '2cb', b: 'psilocybin',
+    title: '2C-B + Psilocybin',
+    body: 'Synergistic; cross-tolerance between the two.'
+  },
+  {
+    a: '2cb', b: 'cannabis',
+    title: '2C-B + Cannabis',
+    body: 'Cannabis amplifies; can destabilize.'
+  },
+  {
+    a: '2cb', b: 'dmt',
+    title: '2C-B + DMT',
+    body: 'Synergistic; effects of each are amplified.'
   }
 ];
 
@@ -71,7 +102,7 @@ export function checkInteractions(substances) {
         if (!named) {
           warnings.push({
             a: psy, b: 'adderall',
-            title: `${cap(psy)} + Adderall`,
+            title: `${labelFor(psy)} + Adderall`,
             body: 'Increased anxiety and cardiovascular strain.'
           });
         }
@@ -81,10 +112,4 @@ export function checkInteractions(substances) {
   // de-dup by title
   const seen = new Set();
   return warnings.filter(w => (seen.has(w.title) ? false : (seen.add(w.title), true)));
-}
-
-function cap(s) {
-  if (s === 'lsd' || s === 'dmt') return s.toUpperCase();
-  if (s === 'mdma') return 'MDMA';
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '../db/db.js';
-import { calcDose, SUBSTANCES } from '../lib/doses.js';
+import { calcDose, labelFor } from '../lib/doses.js';
 import { intervalsFor, nextAllowed, rankAgainstWindow } from '../lib/intervals.js';
 import { useAllSessions } from '../state/store.js';
 
@@ -53,7 +53,7 @@ export default function Dashboard({ goSession, goNew }) {
   const usedSubstances = Object.keys(lastBy);
 
   return (
-    <div className="p-4 space-y-4 pb-28 max-w-md mx-auto" data-testid="dashboard">
+    <div className="p-4 space-y-4 pb-8 max-w-md mx-auto" data-testid="dashboard">
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-medium">Field Notes</h1>
         <span className="text-xs text-ink-3">{new Date().toLocaleDateString()}</span>
@@ -74,8 +74,8 @@ export default function Dashboard({ goSession, goNew }) {
             return (
               <div key={sub} className="card flex items-center justify-between" data-testid={`status-${sub}`}>
                 <div>
-                  <div className="font-medium capitalize">{prettyName(sub)}</div>
-                  <div className="text-xs text-ink-2">
+                  <div className="font-medium" data-testid={`status-label-${sub}`}>{labelFor(sub)}</div>
+                  <div className="text-xs text-ink-2" data-testid={`status-basis-${sub}`}>
                     Last: {formatDays(sinceMs)} ago · {next?.basis || 'no floor'}
                   </div>
                 </div>
@@ -129,14 +129,8 @@ function sessionDoseSummary(allDoses, sid) {
   if (list.length === 0) return '—';
   return list.map(d => {
     const c = calcDose(d);
-    return `${prettyName(d.substance)} ${c.display}`;
+    return `${labelFor(d.substance)} ${c.display}`;
   }).join(' · ');
-}
-
-function prettyName(s) {
-  if (s === 'lsd' || s === 'dmt') return s.toUpperCase();
-  if (s === 'mdma') return 'MDMA';
-  return (s || '').charAt(0).toUpperCase() + (s || '').slice(1);
 }
 
 function formatRelative(ts) {

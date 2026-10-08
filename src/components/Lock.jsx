@@ -11,12 +11,18 @@ export default function Lock({ onUnlock }) {
 
   useEffect(() => {
     (async () => {
-      const has = await hasPasscode();
-      if (has) {
-        setLength(await getPasscodeLength());
-        setMode('enter');
-      } else {
-        setMode('setup');
+      try {
+        const has = await hasPasscode();
+        if (has) {
+          setLength(await getPasscodeLength());
+          setMode('enter');
+        } else {
+          setMode('setup');
+        }
+      } catch (e) {
+        // A failed database open must be visible, not a silent "…" forever.
+        setMode('error');
+        setError(e?.message || String(e));
       }
     })();
   }, []);
@@ -69,6 +75,16 @@ export default function Lock({ onUnlock }) {
   };
 
   if (mode === 'loading') return <div className="h-full flex items-center justify-center text-ink-2">…</div>;
+  if (mode === 'error') {
+    return (
+      <div className="h-full flex flex-col items-center justify-center px-6 gap-3 text-center" data-testid="lock-db-error">
+        <div className="text-xl font-medium text-bad">Could not open the database</div>
+        <div className="text-sm text-ink-1 break-all">{error}</div>
+        <div className="text-xs text-ink-3">Your entries are still on this device. Fully close the app and reopen it. If this keeps happening, free up storage space on the phone.</div>
+        <button className="btn-secondary" onClick={() => location.reload()}>Reload</button>
+      </div>
+    );
+  }
 
   const filledFirst = first.length;
   const filledConfirm = confirm.length;

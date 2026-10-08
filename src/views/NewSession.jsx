@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DoseForm from '../components/DoseForm.jsx';
 import { checkInteractions } from '../lib/interactions.js';
 import { createSession, updateSession, replaceDoses } from '../state/store.js';
 import { cryptoId } from '../db/seed.js';
+import { setDirty } from '../lib/updates.js';
+
+const DIRTY_KEY = 'new-session';
 
 export default function NewSession({ onDone, initial }) {
   const [startedAt, setStartedAt] = useState(initial?.started_at || Date.now());
@@ -10,11 +13,18 @@ export default function NewSession({ onDone, initial }) {
   const [settingTags, setSettingTags] = useState((initial?.setting_tags || []).join(', '));
   const [emptyStomach, setEmptyStomach] = useState(initial?.empty_stomach || 'no');
   const [sourceConfidence, setSourceConfidence] = useState(initial?.source_confidence || 'unknown');
-  const [contextText, setContextText] = useState(initial?.context_text || '');
-  const [reflectionMoment, setReflectionMoment] = useState(initial?.reflection_in_moment || '');
+  const [notes, setNotes] = useState(initial?.notes || '');
   const [doses, setDoses] = useState(initial?.doses?.length ? initial.doses : [{ id: cryptoId(), substance: '', combo_type: 'first', time_offset_min: 0 }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Any edit marks this form dirty so a pending app update waits until it is closed.
+  const touched = useRef(false);
+  const touch = () => {
+    if (!touched.current) { touched.current = true; setDirty(DIRTY_KEY, true); }
+  };
+  useEffect(() => () => setDirty(DIRTY_KEY, false), []);
+  const edit = (setter) => (v) => { touch(); setter(v); };
 
   const warnings = useMemo(() => {
     if (doses.length < 2) return [];
@@ -22,10 +32,11 @@ export default function NewSession({ onDone, initial }) {
   }, [doses]);
 
   const setDose = (idx, next) => {
+    touch();
     const arr = [...doses]; arr[idx] = next; setDoses(arr);
   };
-  const addDose = () => setDoses([...doses, { id: cryptoId(), substance: '', combo_type: 'sequential', time_offset_min: 0 }]);
-  const removeDose = (idx) => setDoses(doses.filter((_, i) => i !== idx));
+  const addDose = () => { touch(); setDoses([...doses, { id: cryptoId(), substance: '', combo_type: 'sequential', time_offset_min: 0 }]); };
+  const removeDose = (idx) => { touch(); setDoses(doses.filter((_, i) => i !== idx)); };
 
   const localDateValue = (ts) => {
     const d = new Date(ts);
@@ -45,13 +56,14 @@ export default function NewSession({ onDone, initial }) {
         setting_tags: settingTags.split(',').map(s => s.trim()).filter(Boolean),
         empty_stomach: emptyStomach,
         source_confidence: sourceConfidence,
-        context_text: contextText,
-        reflection_in_moment: reflectionMoment,
+        notes,
         doses
       };
       let id;
       if (initial?.id) {
-        await updateSession(initial.id, session);
+        // Doses live in their own table; never snapshot them onto the session row.
+        const { doses: _doses, ...patch } = session;
+        await updateSession(initial.id, patch);
         await replaceDoses(initial.id, doses);
         id = initial.id;
       } else {
@@ -66,7 +78,7 @@ export default function NewSession({ onDone, initial }) {
   };
 
   return (
-    <div className="p-4 space-y-4 pb-32 max-w-md mx-auto" data-testid="new-session">
+    <div className="p-4 space-y-4 pb-8 max-w-md mx-auto" data-testid="new-session">
       <div className="text-2xl font-medium">{initial?.id ? 'Edit session' : 'New session'}</div>
 
       <div>
@@ -75,7 +87,7 @@ export default function NewSession({ onDone, initial }) {
           className="field"
           type="datetime-local"
           value={localDateValue(startedAt)}
-          onChange={e => setStartedAt(new Date(e.target.value).getTime())}
+          onChange={e => { const t = new Date(e.target.value).getTime(); if (!Number.isNaN(t)) edit(setStartedAt)(t); }}
           data-testid="start-time"
         />
       </div>
@@ -83,11 +95,11 @@ export default function NewSession({ onDone, initial }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Set tags</label>
-          <input className="field" value={setTags} onChange={e => setSetTags(e.target.value)} placeholder="e.g. tired, focused" />
+          <input className="field" value={setTags} onChange={e => edit(setSetTags)(e.target.value)} placeholder="e.g. tired, focused" data-testid="set-tags" />
         </div>
         <div>
           <label className="label">Setting tags</label>
-          <input className="field" value={settingTags} onChange={e => setSettingTags(e.target.value)} placeholder="e.g. home, alone" />
+          <input className="field" value={settingTags} onChange={e => edit(setSettingTags)(e.target.value)} placeholder="e.g. home, alone" data-testid="setting-tags" />
         </div>
       </div>
 
@@ -95,7 +107,7 @@ export default function NewSession({ onDone, initial }) {
         <label className="label">Empty stomach</label>
         <div className="flex gap-2">
           {['no','partial','yes'].map(o =>
-            <button key={o} className={`tag ${emptyStomach===o ? 'tag-active':''}`} onClick={() => setEmptyStomach(o)}>{o}</button>
+            <button key={o} className={`tag ${emptyStomach===o ? 'tag-active':''}`} onClick={() => edit(setEmptyStomach)(o)}>{o}</button>
           )}
         </div>
       </div>
@@ -104,7 +116,7 @@ export default function NewSession({ onDone, initial }) {
         <label className="label">Source confidence</label>
         <div className="flex gap-2">
           {[['tested','tested'],['trusted','trusted'],['unknown','unknown']].map(([id,label]) =>
-            <button key={id} className={`tag ${sourceConfidence===id ? 'tag-active':''}`} onClick={() => setSourceConfidence(id)}>{label}</button>
+            <button key={id} className={`tag ${sourceConfidence===id ? 'tag-active':''}`} onClick={() => edit(setSourceConfidence)(id)}>{label}</button>
           )}
         </div>
       </div>
@@ -135,19 +147,20 @@ export default function NewSession({ onDone, initial }) {
       )}
 
       <div>
-        <label className="label">Context</label>
-        <textarea className="field min-h-[80px]" value={contextText} onChange={e => setContextText(e.target.value)} placeholder="What's going on around this session?" />
-      </div>
-
-      <div>
-        <label className="label">Reflection — in the moment</label>
-        <textarea className="field min-h-[80px]" value={reflectionMoment} onChange={e => setReflectionMoment(e.target.value)} placeholder="How are you feeling right now?" />
+        <label className="label">Notes</label>
+        <textarea
+          className="field min-h-[120px]"
+          value={notes}
+          onChange={e => edit(setNotes)(e.target.value)}
+          placeholder="Anything about this session: setting, people, music, how it went."
+          data-testid="new-notes"
+        />
       </div>
 
       {error && <div className="text-bad text-sm" data-testid="save-error">{error}</div>}
 
       <div className="flex gap-2">
-        <button className="btn-ghost flex-1" onClick={() => onDone?.(null)}>Cancel</button>
+        <button className="btn-ghost flex-1" onClick={() => onDone?.(null)} data-testid="cancel-session">Cancel</button>
         <button className="btn-primary flex-1" onClick={save} disabled={saving} data-testid="save-session">
           {saving ? 'Saving…' : 'Save session'}
         </button>

@@ -4,6 +4,7 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './index.css';
 import { ensureSeed } from './db/seed.js';
+import { installUpdater } from './lib/updates.js';
 
 ensureSeed().catch(err => console.error('seed failed', err));
 
@@ -20,7 +21,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     import('virtual:pwa-register').then(({ registerSW }) => {
-      registerSW({ immediate: true });
+      installUpdater(registerSW);
     }).catch(()=>{});
   });
 }

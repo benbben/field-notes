@@ -52,6 +52,22 @@ If you want a clean slate, clear the site data in your browser (Safari → Setti
 
 ---
 
+## Updates
+
+The app updates itself on launch. Fully close and reopen it after a new version is published.
+
+An update never interrupts you mid-entry: if you are typing in a form when a new version arrives, a small "Update ready" chip appears and the update applies when you leave that form. Settings shows the build you are running and has a **Check for update** button.
+
+### Updating the app icon
+iOS copies the icon when you add the app to the home screen and never refreshes it. To pick up a new icon without losing anything:
+
+1. Open the app → **Settings → Export JSON** → save the file (Files, iCloud Drive, or share it to yourself).
+2. Long-press the home-screen icon → **Remove App**.
+3. Open the site URL in Safari → **Share → Add to Home Screen**.
+4. Open the new app, set a passcode, then **Settings → Import JSON** and pick the file you saved.
+
+---
+
 ## Troubleshooting
 
 ### Pages won't enable, or the workflow fails on `actions/deploy-pages`
@@ -59,13 +75,21 @@ Go to **Settings → Actions → General → Workflow permissions** and select *
 
 ### Blank page when I open the URL
 The app is a Progressive Web App; sometimes Safari serves a stale cached shell. Quick fix:
-1. In Safari **Settings → Safari → Advanced → Website Data**, search for your site and remove it.
-2. If you installed it to your home screen, long-press the icon → **Remove App**, then re-install from Safari's Share menu.
+1. Fully close the app and reopen it. The app checks for a new version on every launch.
+
+**Deleting the home-screen app deletes its data on iOS. Export JSON from Settings first.**
+Clearing the site's Website Data in Safari (step 2) deletes it too, so export before that as well.
+
+2. In Safari **Settings → Safari → Advanced → Website Data**, search for your site and remove it.
+3. If you installed it to your home screen, long-press the icon → **Remove App**, then re-install from Safari's Share menu and **Import JSON** from Settings.
 
 ### I forgot my passcode
 There is no recovery for the passcode itself. Your options are:
 1. **Restore from your encrypted backup** (Settings → Encrypted GitHub backup → Restore). This requires the passphrase you chose when you set up the backup.
-2. **Clear site data** and start over — this wipes all entries on this device.
+
+**Deleting the home-screen app deletes its data on iOS. Export JSON from Settings first.**
+
+2. **Clear site data** (or remove the home-screen app) and start over — this wipes all entries on this device.
 
 This is intentional: a recovery flow would be a security hole.
 

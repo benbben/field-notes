@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { calcDose, FORMS, PREPS_PSILO, SUBSTANCES } from '../lib/doses.js';
+import { calcDose, FORMS, PREPS_PSILO, SUBSTANCES, TWO_CB_DEFAULTS } from '../lib/doses.js';
 import { db } from '../db/db.js';
 import { cryptoId } from '../db/seed.js';
 
@@ -91,6 +91,39 @@ export default function DoseForm({ value, onChange, onRemove, isFirst }) {
         </>
       )}
 
+      {sub === '2cb' && (
+        <>
+          <label className="label">Form</label>
+          <select
+            className="field"
+            value={v.form || ''}
+            onChange={e => {
+              const f = e.target.value;
+              set({ form: f, ...(TWO_CB_DEFAULTS[f] || { amount: '', unit: '', claimed_potency: '', claimed_potency_unit: '' }) });
+            }}
+            data-testid="2cb-form"
+          >
+            <option value="">Select…</option>
+            {FORMS['2cb'].map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+          {(v.form === 'hcl' || v.form === 'hbr') && (
+            <NumField label="Amount (mg)" step="1" min="1" value={v.amount} onChange={a => set({ amount: a, unit: 'mg' })} testid="2cb-mg" />
+          )}
+          {v.form === 'pill' && (
+            <>
+              <NumField label="Units" step="0.5" value={v.amount} onChange={a => set({ amount: a, unit: 'units' })} testid="2cb-units" />
+              <NumField label="Claimed mg per pill" step="1" value={v.claimed_potency} onChange={p => set({ claimed_potency: p, claimed_potency_unit: 'mg' })} testid="2cb-mgper" />
+            </>
+          )}
+          {v.form === 'volumetric' && (
+            <>
+              <NumField label="Volume (mL)" step="0.1" value={v.amount} onChange={a => set({ amount: a, unit: 'mL' })} testid="2cb-ml" />
+              <NumField label="Concentration (mg/mL)" step="0.5" value={v.claimed_potency} onChange={p => set({ claimed_potency: p, claimed_potency_unit: 'mg/mL' })} testid="2cb-conc" />
+            </>
+          )}
+        </>
+      )}
+
       {sub === 'cannabis' && (
         <>
           <label className="label">Form</label>
@@ -126,7 +159,7 @@ export default function DoseForm({ value, onChange, onRemove, isFirst }) {
             <option value="">Select…</option>
             {FORMS.adderall.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
           </select>
-          <NumField label="Amount (mg)" step="1" value={v.amount} onChange={a => set({ amount: a, unit: 'mg' })} />
+          <NumField label="Amount (mg)" step="1" value={v.amount} onChange={a => set({ amount: a, unit: 'mg' })} testid="adderall-mg" />
         </>
       )}
 
@@ -162,11 +195,11 @@ export default function DoseForm({ value, onChange, onRemove, isFirst }) {
   );
 }
 
-function NumField({ label, value, onChange, step = '1', testid }) {
+function NumField({ label, value, onChange, step = '1', min, testid }) {
   return (
     <div>
       <label className="label">{label}</label>
-      <input className="field" type="number" step={step} value={value ?? ''}
+      <input className="field" type="number" step={step} min={min} value={value ?? ''}
              onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
              inputMode="decimal" data-testid={testid} />
     </div>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { db, BACKUP } from '../db/db.js';
 import { cryptoId } from '../db/seed.js';
+import { EXPORT_SCHEMA, SCHEMA_VERSION, normalizeExportPayload } from '../db/migrations.js';
 
 // Custom data-change emitter — Dexie 4 has no 'changes' event without
 // the dexie-observable plugin, so we notify ourselves after mutations.
 const bus = new EventTarget();
 function notifyChange() { bus.dispatchEvent(new Event('change')); }
-function onChange(fn) {
+export function onChange(fn) {
   bus.addEventListener('change', fn);
   return () => bus.removeEventListener('change', fn);
 }
@@ -53,10 +54,7 @@ export async function createSession(partial) {
       intensity_1_10: null, body_load_1_10: null, headspace_1_10: null,
       effects_tags: [], adverse_effects_text: ''
     },
-    context_text: partial.context_text || '',
-    reflection_in_moment: partial.reflection_in_moment || '',
-    reflection_day_after: partial.reflection_day_after || '',
-    reflection_post: partial.reflection_post || '',
+    notes: typeof partial.notes === 'string' ? partial.notes : '',
     created_at: now,
     updated_at: now,
   };
@@ -110,37 +108,40 @@ export async function exportAll() {
     db.batches.toArray()
   ]);
   return {
-    schema: 'field-notes/1',
+    schema: EXPORT_SCHEMA,
+    schema_version: SCHEMA_VERSION,
     exported_at: Date.now(),
     sessions, doses, strains, batches
   };
 }
 
+// Accepts field-notes/1 and field-notes/2 payloads. v1 sessions have their
+// legacy text fields merged into `notes` before being stored. Anything else
+// is rejected with a clear message (see migrations.js).
 export async function importAll(payload) {
-  if (!payload || payload.schema !== 'field-notes/1') {
-    throw new Error('Unsupported export schema');
-  }
+  const data = normalizeExportPayload(payload);
   await db.transaction('rw', db.sessions, db.doses, db.strains, db.batches, async () => {
-    for (const s of payload.sessions || []) {
+    for (const s of data.sessions) {
       const cur = await db.sessions.get(s.id);
       if (!cur || (s.updated_at || 0) >= (cur.updated_at || 0)) {
         await db.sessions.put(s);
       }
     }
-    for (const d of payload.doses || []) {
+    for (const d of data.doses) {
       const cur = await db.doses.get(d.id);
       if (!cur) await db.doses.put(d);
     }
-    for (const x of payload.strains || []) {
+    for (const x of data.strains) {
       const cur = await db.strains.get(x.id);
       if (!cur) await db.strains.put(x);
     }
-    for (const b of payload.batches || []) {
+    for (const b of data.batches) {
       const cur = await db.batches.get(b.id);
       if (!cur) await db.batches.put(b);
     }
   });
   notifyChange();
+  return { sessions: data.sessions.length, doses: data.doses.length };
 }
 
 export async function getBackupCfg() {
