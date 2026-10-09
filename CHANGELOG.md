@@ -1,8 +1,18 @@
 # Changelog
 
-## Standing rule for schema changes
+## Standing rules
 
 Never modify an existing `db.version(N)` block. Schema changes add `db.version(N+1)` with an `.upgrade()`. Every schema change ships with a populated-DB migration test.
+
+Interval rules live only in `intervals.js`; the dashboard never computes windows itself.
+
+## v1.1.1 — 2026-10-09
+
+### Changed
+- Cross-tolerance is now directional. LSD and psilocybin delay each other and 2C-B. 2C-B has no floor and delays nothing. Dashboard color and countdown now reflect cross-tolerance, not just the substance's own last dose.
+- The window applied across substances is always the source substance's own dose-dependent window (an LSD dose sets the LSD window on the next 2C-B dose). Basis lines read `Cross-tolerance from LSD: 6 days (last 150 µg)`; rows with no applicable window read `no floor`.
+- The 2C-B + LSD and 2C-B + Psilocybin same-session notes now read "Synergistic; effects of each are amplified." and no longer mention cross-tolerance.
+- No schema change, no migration.
 
 ## v1.1 — 2026-10-08
 
@@ -32,7 +42,7 @@ Never modify an existing `db.version(N)` block. Schema changes add `db.version(N
 - SETUP.md troubleshooting steps were lightly reworded around the new warnings, and the crash screen now points to Export instead of clearing website data.
 
 ### Added
-- 2C-B as a substance, between LSD and Cannabis: HCl powder and HBr powder (mg, default 10), pressed pill (units × claimed mg), and volumetric liquid (mL × mg/mL). Re-dose window 6 days. Cross-tolerance with LSD and psilocybin (longest pending window wins). Interaction notes for 2C-B with MDMA, LSD, psilocybin, cannabis, DMT and Adderall.
+- 2C-B as a substance, between LSD and Cannabis: HCl powder and HBr powder (mg, default 10), pressed pill (units × claimed mg), and volumetric liquid (mL × mg/mL). Re-dose window 6 days. Cross-tolerance with LSD and psilocybin (longest pending window wins). Interaction notes for 2C-B with MDMA, LSD, psilocybin, cannabis, DMT and Adderall. *(Superseded in v1.1.1: 2C-B has no floor and cross-tolerance is directional.)*
 - `labelFor(id)` in `src/lib/doses.js` is the single source of substance display names, replacing four duplicated helpers.
 - `scripts/make-icons.mjs`, `scripts/verify-icons.mjs`, `src/db/migrations.js`, `src/lib/updates.js`, `src/lib/exportFile.js`, `src/lib/version.js`.
 

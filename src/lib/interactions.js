@@ -10,7 +10,7 @@
 // - Any psychedelic + Adderall: anxiety, cardio strain
 // - DMT + MDMA: serotonergic load
 // - 2C-B + MDMA: combined cardiovascular and serotonergic load
-// - 2C-B + LSD / Psilocybin: synergistic, cross-tolerance
+// - 2C-B + LSD / Psilocybin: synergistic
 // - 2C-B + Cannabis: cannabis amplifies, can destabilize
 // - 2C-B + DMT: synergistic
 
@@ -67,12 +67,12 @@ const PAIRS = [
   {
     a: '2cb', b: 'lsd',
     title: '2C-B + LSD',
-    body: 'Synergistic; cross-tolerance between the two.'
+    body: 'Synergistic; effects of each are amplified.'
   },
   {
     a: '2cb', b: 'psilocybin',
     title: '2C-B + Psilocybin',
-    body: 'Synergistic; cross-tolerance between the two.'
+    body: 'Synergistic; effects of each are amplified.'
   },
   {
     a: '2cb', b: 'cannabis',

@@ -133,40 +133,30 @@ describe('2C-B unit', () => {
     }
   });
 
-  test('intervals: 2C-B 6 days min=rec, cross-tolerance with LSD/Psilocybin (longest window wins), none for MDMA', () => {
+  test('intervals (v1.1.1): 2C-B has no floor and delays nothing; LSD/psilocybin delay 2C-B one way', () => {
     const iv = intervalsFor({ substance: '2cb', total: 20, totalUnit: 'mg' });
-    assert.equal(iv.minMs, 6 * DAY);
-    assert.equal(iv.recMs, 6 * DAY);
-    assert.equal(iv.minMs, iv.recMs);
-    assert.equal(iv.basis, '6 days');
+    assert.equal(iv.minMs, 0);
+    assert.equal(iv.recMs, 0);
+    assert.equal(iv.basis, 'no floor');
 
-    // LSD with no own dose, 2C-B taken 3 days ago -> cross-tolerance window from 2C-B.
+    // A 2C-B dose 3 days ago delays nothing, not even the next 2C-B dose.
     const last2cb = { substance: '2cb', total: 20, totalUnit: 'mg', startedAt: NOW - 3 * DAY };
-    const lsdNext = nextAllowed('lsd', { '2cb': last2cb });
-    assert.ok(lsdNext, 'nextAllowed(lsd) must not be null when 2C-B was taken');
-    assert.ok(lsdNext.basis.startsWith('Cross-tolerance: 2C-B'), `basis was "${lsdNext.basis}"`);
-    assert.equal(lsdNext.when, last2cb.startedAt + 6 * DAY);
-    assert.equal(lsdNext.whenRec, last2cb.startedAt + 6 * DAY);
-
-    // 2C-B 5 days ago (own window ends at +1d) vs LSD 1 tab 100 ug 1 day ago (6-day window ends at +5d):
-    // the later LSD window wins (longest-window-wins).
-    const lastLsd = { substance: 'lsd', total: 100, totalUnit: `${MICRO}g`, startedAt: NOW - 1 * DAY };
-    const own2cb = { substance: '2cb', total: 10, totalUnit: 'mg', startedAt: NOW - 5 * DAY };
-    const twoCbNext = nextAllowed('2cb', { lsd: lastLsd, '2cb': own2cb });
-    assert.ok(twoCbNext, 'nextAllowed(2cb) must not be null');
-    assert.equal(twoCbNext.when, lastLsd.startedAt + 6 * DAY, `picked window ends at ${twoCbNext.when}, basis "${twoCbNext.basis}"`);
-    assert.ok(twoCbNext.when > own2cb.startedAt + 6 * DAY, 'LSD window must end later than the own 2C-B window');
-    assert.ok(twoCbNext.basis.startsWith('Cross-tolerance: LSD'), `basis was "${twoCbNext.basis}"`);
-
-    // Psilocybin also cross-tolerates with 2C-B.
-    const psiNext = nextAllowed('psilocybin', { '2cb': last2cb });
-    assert.ok(psiNext, 'nextAllowed(psilocybin) must not be null when 2C-B was taken');
-    assert.ok(psiNext.basis.startsWith('Cross-tolerance: 2C-B'), `basis was "${psiNext.basis}"`);
-    assert.equal(psiNext.when, last2cb.startedAt + 6 * DAY);
-
-    // MDMA has no cross-tolerance with 2C-B: nothing to report.
+    assert.equal(nextAllowed('2cb', { '2cb': last2cb }), null);
+    assert.equal(nextAllowed('lsd', { '2cb': last2cb }), null);
+    assert.equal(nextAllowed('psilocybin', { '2cb': last2cb }), null);
     assert.equal(nextAllowed('mdma', { '2cb': last2cb }), null);
 
-    assert.deepEqual([...CROSS_TOLERANCE].sort(), ['2cb', 'lsd', 'psilocybin'].sort());
+    // LSD 1 tab 100 ug 1 day ago delays the next 2C-B dose by LSD's own 6-day window.
+    const lastLsd = { substance: 'lsd', total: 100, totalUnit: `${MICRO}g`, startedAt: NOW - 1 * DAY };
+    const twoCbNext = nextAllowed('2cb', { lsd: lastLsd, '2cb': last2cb });
+    assert.ok(twoCbNext, 'nextAllowed(2cb) must not be null when LSD was taken');
+    assert.equal(twoCbNext.source, 'lsd');
+    assert.equal(twoCbNext.when, lastLsd.startedAt + 6 * DAY);
+    assert.equal(twoCbNext.basis, `Cross-tolerance from LSD: 6 days (last 100 ${MICRO}g)`);
+
+    // Directed table shape.
+    assert.deepEqual(CROSS_TOLERANCE['2cb'], []);
+    assert.deepEqual([...CROSS_TOLERANCE.lsd].sort(), ['2cb', 'lsd', 'psilocybin']);
+    assert.deepEqual([...CROSS_TOLERANCE.psilocybin].sort(), ['2cb', 'lsd', 'psilocybin']);
   });
 });

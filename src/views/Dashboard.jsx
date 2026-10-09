@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '../db/db.js';
 import { calcDose, labelFor } from '../lib/doses.js';
-import { intervalsFor, nextAllowed, rankAgainstWindow } from '../lib/intervals.js';
+import { nextAllowed, statusFor } from '../lib/intervals.js';
 import { useAllSessions } from '../state/store.js';
 
 const DAY = 24*60*60*1000;
@@ -67,33 +67,20 @@ export default function Dashboard({ goSession, goNew }) {
         <div className="space-y-2">
           {usedSubstances.map(sub => {
             const last = lastBy[sub];
-            const iv = intervalsFor(last);
-            const rank = rankAgainstWindow(now, last.startedAt, iv);
-            const next = nextAllowed(sub, lastBy);
+            // Windows (own and cross-tolerance) come only from intervals.js.
+            const status = statusFor(nextAllowed(sub, lastBy), now);
             const sinceMs = now - last.startedAt;
             return (
               <div key={sub} className="card flex items-center justify-between" data-testid={`status-${sub}`}>
                 <div>
                   <div className="font-medium" data-testid={`status-label-${sub}`}>{labelFor(sub)}</div>
                   <div className="text-xs text-ink-2" data-testid={`status-basis-${sub}`}>
-                    Last: {formatDays(sinceMs)} ago · {next?.basis || 'no floor'}
+                    Last: {formatDays(sinceMs)} ago · {status.basis}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`dot dot-${rank.color}`} data-testid={`status-color-${sub}`}></span>
-                  <span className="text-xs text-ink-1" data-testid={`next-${sub}`}>
-                    {(() => {
-                      if (iv.minMs === 0) return 'clear';
-                      const elapsed = now - last.startedAt;
-                      if (elapsed < iv.minMs) {
-                        return `${Math.ceil((iv.minMs - elapsed)/DAY)}d`;
-                      }
-                      if (elapsed < iv.recMs) {
-                        return `${Math.ceil((iv.recMs - elapsed)/DAY)}d rec`;
-                      }
-                      return 'OK';
-                    })()}
-                  </span>
+                  <span className={`dot dot-${status.color}`} data-testid={`status-color-${sub}`}></span>
+                  <span className="text-xs text-ink-1" data-testid={`next-${sub}`}>{status.countdown}</span>
                 </div>
               </div>
             );

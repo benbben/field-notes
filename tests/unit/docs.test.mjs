@@ -135,14 +135,14 @@ describe('docs + repo guards', () => {
 
   // ---------------------------------------------------------------- 5. package.json
 
-  test('5. package.json: test script, devDependencies (sharp, playwright, fake-indexeddb), version 1.1.0', { timeout: FILE_TIMEOUT }, () => {
+  test('5. package.json: test script, devDependencies (sharp, playwright, fake-indexeddb), version 1.1.1', { timeout: FILE_TIMEOUT }, () => {
     const pkg = JSON.parse(read('package.json'));
     assert.equal(pkg.scripts?.test, 'node tests/run.mjs');
     for (const dep of ['sharp', 'playwright', 'fake-indexeddb']) {
       assert.equal(typeof pkg.devDependencies?.[dep], 'string', `devDependencies must include ${dep}`);
       assert.ok(pkg.devDependencies[dep].length > 0, `devDependencies.${dep} must be a non-empty range`);
     }
-    assert.equal(pkg.version, '1.1.0');
+    assert.equal(pkg.version, '1.1.1');
   });
 
   // ---------------------------------------------------------------- 6. icons / PWA wiring

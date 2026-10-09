@@ -177,12 +177,12 @@ describe('2C-B e2e', () => {
     }
   });
 
-  test('10. dashboard: 2C-B 3 days ago -> red "3d" (6 days); LSD 20 days ago -> basis cross-tolerance 2C-B, dot green; Sessions filter 2C-B', async () => {
+  test('10. dashboard (v1.1.1): 2C-B 3 days ago -> green "clear", "no floor"; LSD 20 days ago -> LSD own window only; Sessions filter 2C-B', async () => {
     const page = await freshApp();
     try {
       await setupAndOpenNewSession(page);
 
-      // Single 2C-B hcl 10 mg dose, started exactly 3 days ago.
+      // Single 2C-B hcl 10 mg dose, started exactly 3 days ago: 2C-B has no floor.
       await setStartTime(page, Date.now() - 3 * DAY);
       const c0 = await addDose(page, 0, { substance: '2cb', form: 'hcl', fields: { '2cb-mg': 10 } });
       assert.match(c0, /10 mg/, `dose calculated: ${c0}`);
@@ -193,15 +193,15 @@ describe('2C-B e2e', () => {
       const dot2cb = page.locator('[data-testid="status-color-2cb"]');
       await dot2cb.waitFor({ state: 'attached' });
       const dotClass = await waitForAttribute(dot2cb, 'class', /\bdot-(green|yellow|red)\b/);
-      assert.match(dotClass, /\bdot-red\b/, `2C-B dot class was "${dotClass}"`);
+      assert.match(dotClass, /\bdot-green\b/, `2C-B dot class was "${dotClass}"`);
       const next2cb = await waitForText(page.locator('[data-testid="next-2cb"]'), /\S/);
-      assert.equal(next2cb.trim(), '3d');
-      const basis2cb = await waitForText(page.locator('[data-testid="status-basis-2cb"]'), '6 days');
-      assert.match(basis2cb, /6 days/);
-      assert.match(basis2cb, /2C-B/);
+      assert.equal(next2cb.trim(), 'clear');
+      const basis2cb = await waitForText(page.locator('[data-testid="status-basis-2cb"]'), 'no floor');
+      assert.match(basis2cb, /no floor/);
+      assert.doesNotMatch(basis2cb, /Cross-tolerance|6 days/);
       assert.ok(!basis2cb.includes('2cb'), `basis must not contain raw id: ${basis2cb}`);
 
-      // Same context: LSD tab, 1 unit x 100 ug, started 20 days ago.
+      // Same context: LSD tab, 1 unit x 100 ug, started 20 days ago (its 6-day window is long expired).
       await openNewSession(page);
       await setStartTime(page, Date.now() - 20 * DAY);
       const c1 = await addDose(page, 0, { substance: 'lsd', form: 'tab', fields: { 'lsd-units': 1, 'lsd-ugper': 100 } });
@@ -212,20 +212,21 @@ describe('2C-B e2e', () => {
       await page.click('[data-testid="tab-dashboard"]');
       const dotLsd = page.locator('[data-testid="status-color-lsd"]');
       await dotLsd.waitFor({ state: 'attached' });
-      // The basis line comes from nextAllowed(), which applies LSD <-> 2C-B cross-tolerance: the 2C-B window
-      // (3 days ago + 6 days = +3 days) ends later than LSD's own 6-day window (20 days ago, long expired),
-      // so the longest window wins and the basis names 2C-B.
-      const basisLsd = await waitForText(page.locator('[data-testid="status-basis-lsd"]'), 'Cross-tolerance: 2C-B');
-      assert.match(basisLsd, /Cross-tolerance: 2C-B/);
-      // The dot, however, reflects rankAgainstWindow() against LSD's OWN interval (intervalsFor(lastBy.lsd)):
-      // 20 days elapsed > 6-day window -> green, regardless of the cross-tolerance basis shown beside it.
+      // LSD row: its own window only. 2C-B never delays LSD, so no "Cross-tolerance from 2C-B" anywhere.
+      const basisLsd = await waitForText(page.locator('[data-testid="status-basis-lsd"]'), 'LSD 6 days');
+      assert.match(basisLsd, /LSD 6 days \(last 100 /);
+      assert.doesNotMatch(basisLsd, /Cross-tolerance/);
       const lsdClass = await waitForAttribute(dotLsd, 'class', /\bdot-(green|yellow|red)\b/);
       assert.match(lsdClass, /\bdot-green\b/, `LSD dot class was "${lsdClass}"`);
       const nextLsd = await waitForText(page.locator('[data-testid="next-lsd"]'), /\S/);
       assert.equal(nextLsd.trim(), 'OK', 'next-lsd reflects the own (expired) window');
-      // The 2C-B card itself is unchanged by the LSD session.
-      assert.match(await dot2cb.getAttribute('class'), /\bdot-red\b/);
-      assert.equal((await page.locator('[data-testid="next-2cb"]').textContent())?.trim(), '3d');
+      // The 2C-B row now inherits the (expired) LSD window: still green, basis names LSD.
+      const basis2cbAfter = await waitForText(page.locator('[data-testid="status-basis-2cb"]'), 'Cross-tolerance from LSD');
+      assert.match(basis2cbAfter, /Cross-tolerance from LSD: 6 days \(last 100 /);
+      assert.match(await dot2cb.getAttribute('class'), /\bdot-green\b/);
+      assert.equal((await page.locator('[data-testid="next-2cb"]').textContent())?.trim(), 'OK');
+      const bodyText = (await page.locator('body').textContent()) ?? '';
+      assert.doesNotMatch(bodyText, /Cross-tolerance from 2C-B/);
 
       // Sessions filter: option value "2cb" labelled "2C-B" shows only the 2C-B session.
       await page.click('[data-testid="tab-sessions"]');
